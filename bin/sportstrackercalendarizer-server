@@ -12,11 +12,19 @@ app = Flask(__name__)
 
 # Config
 # TODO: Move to separate config file or something
-# TODO: Implement login
-sttauth = 'INSERT_YOUR_STT_AUTHORIZATION_TOKEN_HERE'
+username = 'INSERT_USERNAME_HERE'
+password = 'INSERT_PASSWORD_HERE'
+
+sports_login_url = 'https://www.sports-tracker.com/apiserver/v1/login?source=javascript'
 sports_workouts_api_url = 'https://www.sports-tracker.com/apiserver/v1/workouts?sortonst=true&limit=100000&since=0'
 
 def get_workouts():
+    # First login and get session key
+    r = requests.post(sports_login_url, data={'l': username, 'p': password})
+    logindata = json.loads(r.text)
+    sttauth = logindata['sessionkey']
+
+    # Use session key to get user's own workouts
     headers = {'STTAuthorization': sttauth}
     r = requests.get(sports_workouts_api_url, headers=headers)
     return json.loads(r.text)
