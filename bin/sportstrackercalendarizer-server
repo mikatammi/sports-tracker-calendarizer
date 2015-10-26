@@ -1,0 +1,71 @@
+#!/usr/bin/env python
+# Sports Tracker Calendarizer Server
+
+from flask import Flask, Response
+from icalendar import Calendar, Event
+from datetime import datetime
+import json
+import requests
+
+# Create app
+app = Flask(__name__)
+
+# Config
+# TODO: Move to separate config file or something
+# TODO: Implement login
+sttauth = 'INSERT_YOUR_STT_AUTHORIZATION_TOKEN_HERE'
+sports_workouts_api_url = 'https://www.sports-tracker.com/apiserver/v1/workouts?sortonst=true&limit=100000&since=0'
+
+def get_workouts():
+    headers = {'STTAuthorization': sttauth}
+    r = requests.get(sports_workouts_api_url, headers=headers)
+    return json.loads(r.text)
+
+# Calendar getter
+@app.route("/cal")
+def calendarize():
+    # Get data from Sports Tracker service and parse JSON object
+    sportstrackerdata = get_workouts()
+
+    # Create new Calendar object and set product id and version fields
+    cal = Calendar()
+    cal.add('prodid', '-//Mika Tammi//Sports Tracker Calendarizer Server//EN')
+    cal.add('version', '0.1')
+
+    for st in sportstrackerdata['payload']:
+
+        # TODO: Clean up this loop
+        distance = '%.2f km' % (float(st['totalDistance']) / 1000)
+
+        activitytype = ''
+
+        # TODO: Map different activity Ids to strings
+        if st['activityId'] == 2:
+            activitytype = 'Cycling'
+        elif st['activityId'] == 0:
+            activitytype = 'Walking'
+
+        summary = activitytype + ' - ' + distance
+
+        if 'description' in st:
+            summary += ' - %s' % st['description']
+
+        # Convert unix timestamps to datetime objects
+        starttime = datetime.fromtimestamp(float(st['startTime'])/1000)
+        stoptime = datetime.fromtimestamp(float(st['stopTime'])/1000)
+
+        # Create actual event object for calendar
+        event = Event()
+        event.add('summary', summary)
+        event.add('dtstart', starttime)
+        event.add('dtend', stoptime)
+        event.add('dtstamp', starttime)
+
+        # Add event to calendar
+        cal.add_component(event)
+
+    # Return calendar in icalendar format
+    return Response(cal.to_ical(), mimetype='text/calendar')
+
+if __name__ == '__main__':
+    app.run()
